@@ -57,14 +57,7 @@ class DiaryPane(ctk.CTkFrame):
             command=self._toggle_select_all,
             checkbox_width=18, checkbox_height=18,
         )
-        self._select_all_cb.grid(row=0, column=0, padx=(0, 8))
-
-        self._delete_btn = ctk.CTkButton(
-            tb, text="Delete", width=70,
-            fg_color="#c0392b", hover_color="#96281b",
-            command=self._delete_selected,
-        )
-        self._delete_btn.grid(row=0, column=1)
+        self._select_all_cb.grid(row=0, column=0)
 
         # -- Treeview (styled) --------------------------------------------
         style = ttk.Style()
@@ -96,7 +89,7 @@ class DiaryPane(ctk.CTkFrame):
             foreground=[("selected", "#ffffff")],
         )
 
-        columns = ("sel", "status", "title", "date", "hours", "category")
+        columns = ("sel", "ea_st", "pa_st", "title", "date", "hours")
         self._tree = ttk.Treeview(
             self,
             columns=columns,
@@ -106,18 +99,18 @@ class DiaryPane(ctk.CTkFrame):
         )
 
         self._tree.heading("sel",      text="☐")
-        self._tree.heading("status",   text="Status")
+        self._tree.heading("ea_st",    text="EA")
+        self._tree.heading("pa_st",    text="PA")
         self._tree.heading("title",    text="Title")
         self._tree.heading("date",     text="Date")
         self._tree.heading("hours",    text="Hours")
-        self._tree.heading("category", text="Category")
 
         self._tree.column("sel",      width=36,  minwidth=36,  stretch=False, anchor="center")
-        self._tree.column("status",   width=72,  minwidth=60,  stretch=False, anchor="center")
-        self._tree.column("title",    width=200, minwidth=120, stretch=True)
+        self._tree.column("ea_st",    width=60,  minwidth=50,  stretch=False, anchor="center")
+        self._tree.column("pa_st",    width=60,  minwidth=50,  stretch=False, anchor="center")
+        self._tree.column("title",    width=220, minwidth=120, stretch=True)
         self._tree.column("date",     width=100, minwidth=90,  stretch=False, anchor="center")
         self._tree.column("hours",    width=60,  minwidth=50,  stretch=False, anchor="center")
-        self._tree.column("category", width=180, minwidth=100, stretch=True)
 
         # Scrollbar
         scrollbar = ctk.CTkScrollbar(self, command=self._tree.yview)
@@ -143,11 +136,12 @@ class DiaryPane(ctk.CTkFrame):
         self._tree.delete(*self._tree.get_children())
         for act in self._activities:
             sel_mark = "☑" if act.selected else "☐"
-            status_mark = "✓ Uploaded" if act.status == "Uploaded" else "● Pending"
+            ea_mark = "✓" if act.ea_status == "Uploaded" else "●"
+            pa_mark = "✓" if act.pa_status == "Uploaded" else "●"
             self._tree.insert(
                 "", "end",
                 iid=act.id,
-                values=(sel_mark, status_mark, act.title, act.date, act.hours, act.category),
+                values=(sel_mark, ea_mark, pa_mark, act.title, act.date, act.hours),
             )
 
     def get_selected_activities(self) -> list[Activity]:
@@ -196,11 +190,3 @@ class DiaryPane(ctk.CTkFrame):
             storage.update_activity(act.id, selected=state)
         self.refresh()
 
-    def _delete_selected(self):
-        """Delete the currently highlighted (selected) row."""
-        sel = self._tree.selection()
-        if not sel:
-            return
-        act_id = sel[0]
-        storage.delete_activity(act_id)
-        self.refresh()

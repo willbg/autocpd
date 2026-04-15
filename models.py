@@ -24,14 +24,6 @@ PA_CATEGORIES: list[str] = [
     "Soft Skills",
 ]
 
-# Portal names for the UI dropdown / logic switches
-PORTALS: list[str] = ["EA", "PA"]
-
-CATEGORY_MAP: dict[str, list[str]] = {
-    "EA": EA_CATEGORIES,
-    "PA": PA_CATEGORIES,
-}
-
 
 # ---------------------------------------------------------------------------
 # Activity data-class
@@ -39,15 +31,21 @@ CATEGORY_MAP: dict[str, list[str]] = {
 
 @dataclass
 class Activity:
-    """A single CPD diary entry."""
+    """A single CPD diary entry.
+
+    Each entry is mapped to *both* EA and PA portals with independent
+    category selections and upload statuses.
+    """
 
     title: str
-    date: str                         # ISO YYYY-MM-DD
+    date: str                              # ISO YYYY-MM-DD
     hours: float
-    category: str
+    ea_category: str
+    pa_category: str
     evidence_path: str
-    status: str = "Pending"           # "Pending" | "Uploaded"
-    selected: bool = False            # checkbox for bulk upload
+    ea_status: str = "Pending"             # "Pending" | "Uploaded"
+    pa_status: str = "Pending"             # "Pending" | "Uploaded"
+    selected: bool = False                 # checkbox for bulk upload
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     created_at: str = field(default_factory=lambda: datetime.now().isoformat())
 
@@ -59,10 +57,23 @@ class Activity:
 
     @classmethod
     def from_dict(cls, data: dict) -> Activity:
-        """Construct an Activity from a dict (e.g. loaded from JSON)."""
-        # Tolerate extra / missing keys gracefully
+        """Construct an Activity from a dict (e.g. loaded from JSON).
+
+        Migrates legacy single-field records transparently.
+        """
         known_fields = {f.name for f in cls.__dataclass_fields__.values()}
         filtered = {k: v for k, v in data.items() if k in known_fields}
+
+        # --- migrate old single-category / single-status records ----------
+        if "category" in data and "ea_category" not in filtered:
+            filtered["ea_category"] = data["category"]
+        if "category" in data and "pa_category" not in filtered:
+            filtered["pa_category"] = ""
+        if "status" in data and "ea_status" not in filtered:
+            filtered["ea_status"] = data["status"]
+        if "status" in data and "pa_status" not in filtered:
+            filtered["pa_status"] = "Pending"
+
         return cls(**filtered)
 
     # -- convenience ----------------------------------------------------------

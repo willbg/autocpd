@@ -49,6 +49,7 @@ class AutoCPDApp(ctk.CTk):
         self.entry_pane = EntryPane(
             self,
             on_save_callback=self._on_entry_saved,
+            on_delete_callback=self._on_entry_deleted,
             corner_radius=8,
         )
         self.entry_pane.grid(row=0, column=0, sticky="nsew", padx=(8, 6), pady=8)
@@ -67,6 +68,11 @@ class AutoCPDApp(ctk.CTk):
         """Called after an entry is added or updated."""
         self.diary_pane.refresh()
         self.control_pane.log("Entry saved ✓")
+
+    def _on_entry_deleted(self):
+        """Called after an entry is deleted from the entry pane."""
+        self.diary_pane.refresh()
+        self.control_pane.log("Entry deleted 🗑")
 
     def _on_diary_select(self, activity):
         """Called when the user clicks a row in the diary table."""

@@ -8,21 +8,26 @@ from tkinter import filedialog, StringVar
 
 import customtkinter as ctk
 
-from models import Activity, CATEGORY_MAP, PORTALS
+from models import Activity, EA_CATEGORIES, PA_CATEGORIES
 
 
 class EntryPane(ctk.CTkFrame):
     """Input form for creating and editing CPD diary entries.
 
+    Each entry maps to **both** EA and PA portals, so the form shows two
+    category dropdowns side-by-side.
+
     When a row is selected in the diary table the form is populated with that
-    record's data and the primary button switches to **Update**.  Clicking
-    *Clear* resets back to *Add* mode.
+    record's data, the header shows "Editing: <title>", and the primary
+    button switches to **Update**.  A **Delete** button also appears.
+    Clicking *Clear* resets back to *Add* mode.
     """
 
-    def __init__(self, master, on_save_callback=None, **kwargs):
+    def __init__(self, master, on_save_callback=None, on_delete_callback=None, **kwargs):
         super().__init__(master, **kwargs)
-        self._on_save = on_save_callback  # called after add / update
-        self._editing_id: str | None = None  # set when editing an existing record
+        self._on_save = on_save_callback      # called after add / update
+        self._on_delete = on_delete_callback  # called after delete
+        self._editing_id: str | None = None   # set when editing an existing record
 
         self._build_widgets()
 
@@ -39,21 +44,18 @@ class EntryPane(ctk.CTkFrame):
         row = 0
 
         # -- Header -------------------------------------------------------
-        header = ctk.CTkLabel(self, text="CPD Entry", font=ctk.CTkFont(size=18, weight="bold"))
-        header.grid(row=row, column=0, padx=12, pady=(12, 8), sticky="w")
+        self._header_label = ctk.CTkLabel(
+            self, text="CPD Entry", font=ctk.CTkFont(size=18, weight="bold"),
+        )
+        self._header_label.grid(row=row, column=0, padx=12, pady=(12, 2), sticky="w")
         row += 1
 
-        # -- Portal selector (EA / PA) ------------------------------------
-        ctk.CTkLabel(self, text="Portal").grid(row=row, column=0, **pad)
-        row += 1
-        self._portal_var = StringVar(value=PORTALS[0])
-        self._portal_menu = ctk.CTkOptionMenu(
-            self,
-            variable=self._portal_var,
-            values=PORTALS,
-            command=self._on_portal_changed,
+        # -- Editing indicator (hidden by default) -------------------------
+        self._editing_label = ctk.CTkLabel(
+            self, text="", font=ctk.CTkFont(size=12, slant="italic"),
+            text_color="#5dade2",
         )
-        self._portal_menu.grid(row=row, column=0, **entry_pad)
+        self._editing_label.grid(row=row, column=0, padx=12, pady=(0, 6), sticky="w")
         row += 1
 
         # -- Title ---------------------------------------------------------
@@ -66,7 +68,8 @@ class EntryPane(ctk.CTkFrame):
         # -- Date ----------------------------------------------------------
         ctk.CTkLabel(self, text="Date (YYYY-MM-DD) *").grid(row=row, column=0, **pad)
         row += 1
-        self._date_entry = ctk.CTkEntry(self, placeholder_text=date.today().isoformat())
+        self._date_entry = ctk.CTkEntry(self)
+        self._date_entry.insert(0, date.today().isoformat())
         self._date_entry.grid(row=row, column=0, **entry_pad)
         row += 1
 
@@ -77,16 +80,28 @@ class EntryPane(ctk.CTkFrame):
         self._hours_entry.grid(row=row, column=0, **entry_pad)
         row += 1
 
-        # -- Category ------------------------------------------------------
-        ctk.CTkLabel(self, text="Category *").grid(row=row, column=0, **pad)
+        # -- EA Category ---------------------------------------------------
+        ctk.CTkLabel(self, text="EA Category *").grid(row=row, column=0, **pad)
         row += 1
-        self._category_var = StringVar(value="")
-        self._category_menu = ctk.CTkOptionMenu(
+        self._ea_category_var = StringVar(value=EA_CATEGORIES[0])
+        self._ea_category_menu = ctk.CTkOptionMenu(
             self,
-            variable=self._category_var,
-            values=CATEGORY_MAP[self._portal_var.get()],
+            variable=self._ea_category_var,
+            values=EA_CATEGORIES,
         )
-        self._category_menu.grid(row=row, column=0, **entry_pad)
+        self._ea_category_menu.grid(row=row, column=0, **entry_pad)
+        row += 1
+
+        # -- PA Category ---------------------------------------------------
+        ctk.CTkLabel(self, text="PA Category *").grid(row=row, column=0, **pad)
+        row += 1
+        self._pa_category_var = StringVar(value=PA_CATEGORIES[0])
+        self._pa_category_menu = ctk.CTkOptionMenu(
+            self,
+            variable=self._pa_category_var,
+            values=PA_CATEGORIES,
+        )
+        self._pa_category_menu.grid(row=row, column=0, **entry_pad)
         row += 1
 
         # -- Evidence file path --------------------------------------------
@@ -122,7 +137,7 @@ class EntryPane(ctk.CTkFrame):
 
         # -- Action buttons ------------------------------------------------
         btn_frame = ctk.CTkFrame(self, fg_color="transparent")
-        btn_frame.grid(row=row, column=0, padx=12, pady=(8, 12), sticky="ew")
+        btn_frame.grid(row=row, column=0, padx=12, pady=(8, 4), sticky="ew")
         btn_frame.columnconfigure((0, 1), weight=1)
 
         self._action_btn = ctk.CTkButton(
@@ -144,9 +159,23 @@ class EntryPane(ctk.CTkFrame):
         self._clear_btn.grid(row=0, column=1, padx=(4, 0), sticky="ew")
         row += 1
 
+        # -- Delete button (only visible when editing) ---------------------
+        self._delete_btn = ctk.CTkButton(
+            self,
+            text="🗑  Delete Entry",
+            command=self._on_delete_clicked,
+            fg_color="#c0392b",
+            hover_color="#96281b",
+        )
+        # Hidden initially — shown via populate(), hidden via clear_form()
+        row += 1
+
         # -- Validation feedback -------------------------------------------
-        self._error_label = ctk.CTkLabel(self, text="", text_color="#e05050", font=ctk.CTkFont(size=11))
+        self._error_label = ctk.CTkLabel(
+            self, text="", text_color="#e05050", font=ctk.CTkFont(size=11),
+        )
         self._error_label.grid(row=row, column=0, padx=12, sticky="w")
+        self._delete_row = row - 1  # remember which row the delete btn goes in
 
         # -- Enable drag-and-drop if tkdnd is available --------------------
         self._setup_dnd()
@@ -174,13 +203,6 @@ class EntryPane(ctk.CTkFrame):
     # Callbacks
     # ------------------------------------------------------------------
 
-    def _on_portal_changed(self, portal: str):
-        """Refresh the category dropdown when the portal changes."""
-        cats = CATEGORY_MAP.get(portal, [])
-        self._category_menu.configure(values=cats)
-        if cats:
-            self._category_var.set(cats[0])
-
     def _browse_evidence(self):
         path = filedialog.askopenfilename(
             title="Select evidence file",
@@ -195,7 +217,8 @@ class EntryPane(ctk.CTkFrame):
         title = self._title_entry.get().strip()
         date_str = self._date_entry.get().strip()
         hours_str = self._hours_entry.get().strip()
-        category = self._category_var.get()
+        ea_cat = self._ea_category_var.get()
+        pa_cat = self._pa_category_var.get()
         evidence = self._evidence_entry.get().strip()
 
         # --- validation ---------------------------------------------------
@@ -206,8 +229,10 @@ class EntryPane(ctk.CTkFrame):
             errors.append("Date must be YYYY-MM-DD.")
         if not Activity.validate_hours(hours_str):
             errors.append("Hours must be a positive number.")
-        if not category:
-            errors.append("Select a category.")
+        if not ea_cat:
+            errors.append("Select an EA category.")
+        if not pa_cat:
+            errors.append("Select a PA category.")
         if not evidence:
             errors.append("Evidence file is required.")
         if errors:
@@ -225,7 +250,8 @@ class EntryPane(ctk.CTkFrame):
                 title=title,
                 date=date_str,
                 hours=hours,
-                category=category,
+                ea_category=ea_cat,
+                pa_category=pa_cat,
                 evidence_path=evidence,
             )
         else:
@@ -235,7 +261,8 @@ class EntryPane(ctk.CTkFrame):
                 title=title,
                 date=date_str,
                 hours=hours,
-                category=category,
+                ea_category=ea_cat,
+                pa_category=pa_cat,
                 evidence_path=evidence,
             )
             add_activity(activity)
@@ -244,6 +271,16 @@ class EntryPane(ctk.CTkFrame):
         if self._on_save:
             self._on_save()
 
+    def _on_delete_clicked(self):
+        """Delete the currently-loaded record."""
+        if not self._editing_id:
+            return
+        from storage import delete_activity
+        delete_activity(self._editing_id)
+        self.clear_form()
+        if self._on_delete:
+            self._on_delete()
+
     # ------------------------------------------------------------------
     # Public helpers
     # ------------------------------------------------------------------
@@ -251,7 +288,16 @@ class EntryPane(ctk.CTkFrame):
     def populate(self, activity: Activity):
         """Fill the form with an existing activity for editing."""
         self._editing_id = activity.id
-        self._action_btn.configure(text="Update Entry", fg_color="#2980b9", hover_color="#1f6fa5")
+        self._header_label.configure(text="Edit Entry")
+        self._editing_label.configure(text=f"Editing: {activity.title}")
+        self._action_btn.configure(
+            text="Update Entry", fg_color="#2980b9", hover_color="#1f6fa5",
+        )
+
+        # Show delete button
+        self._delete_btn.grid(
+            row=self._delete_row, column=0, padx=12, pady=(0, 4), sticky="ew",
+        )
 
         self._title_entry.delete(0, "end")
         self._title_entry.insert(0, activity.title)
@@ -265,22 +311,26 @@ class EntryPane(ctk.CTkFrame):
         self._evidence_entry.delete(0, "end")
         self._evidence_entry.insert(0, activity.evidence_path)
 
-        # Set portal + category (detect which portal the category belongs to)
-        for portal, cats in CATEGORY_MAP.items():
-            if activity.category in cats:
-                self._portal_var.set(portal)
-                self._on_portal_changed(portal)
-                break
-        self._category_var.set(activity.category)
+        self._ea_category_var.set(activity.ea_category)
+        self._pa_category_var.set(activity.pa_category)
 
     def clear_form(self):
         """Reset all fields and return to Add mode."""
         self._editing_id = None
-        self._action_btn.configure(text="Add Entry", fg_color="#2fa572", hover_color="#26855c")
+        self._header_label.configure(text="CPD Entry")
+        self._editing_label.configure(text="")
+        self._action_btn.configure(
+            text="Add Entry", fg_color="#2fa572", hover_color="#26855c",
+        )
         self._error_label.configure(text="")
+
+        # Hide delete button
+        self._delete_btn.grid_forget()
 
         self._title_entry.delete(0, "end")
         self._date_entry.delete(0, "end")
+        self._date_entry.insert(0, date.today().isoformat())
         self._hours_entry.delete(0, "end")
         self._evidence_entry.delete(0, "end")
-        self._category_var.set(CATEGORY_MAP[self._portal_var.get()][0])
+        self._ea_category_var.set(EA_CATEGORIES[0])
+        self._pa_category_var.set(PA_CATEGORIES[0])
