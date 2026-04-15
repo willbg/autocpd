@@ -1,0 +1,24 @@
+{
+  "EA": {
+    "portal_url": "https://portal.engineersaustralia.org.au",
+    "selectors": {
+      "title": "",
+      "date": "",
+      "hours": "",
+      "category": "",
+      "evidence_upload": "",
+      "save_button": ""
+    }
+  },
+  "PA": {
+    "portal_url": "https://www.professionalsaustralia.org.au",
+    "selectors": {
+      "title": "",
+      "date": "",
+      "hours": "",
+      "category": "",
+      "evidence_upload": "",
+      "save_button": ""
+    }
+  }
+}
