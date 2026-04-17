@@ -211,14 +211,6 @@ class EntryPane(ctk.CTkFrame):
 
         ctrl_pad = {"padx": 12, "sticky": "ew"}
 
-        self._browser_btn = ctk.CTkButton(
-            self, text="🌐  Launch Browser",
-            command=lambda: self._emit_log("Launch Browser clicked (Selenium not yet wired)."),
-            fg_color="#2980b9", hover_color="#1f6fa5",
-        )
-        self._browser_btn.grid(row=row, column=0, pady=(4, 4), **ctrl_pad)
-        row += 1
-
         self._sync_pa_btn = ctk.CTkButton(
             self, text="⬆  Sync to PA",
             command=lambda: self._emit_log("Sync to PA clicked (Selenium not yet wired)."),
