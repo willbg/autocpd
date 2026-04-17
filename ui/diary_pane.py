@@ -36,28 +36,11 @@ class DiaryPane(ctk.CTkFrame):
         self.rowconfigure(1, weight=1)
 
         # -- Header -------------------------------------------------------
-        header_frame = ctk.CTkFrame(self, fg_color="transparent")
-        header_frame.grid(row=0, column=0, sticky="ew", padx=8, pady=(8, 4))
-        header_frame.columnconfigure(0, weight=1)
-
         ctk.CTkLabel(
-            header_frame,
+            self,
             text="CPD Diary",
             font=ctk.CTkFont(size=18, weight="bold"),
-        ).grid(row=0, column=0, sticky="w")
-
-        # Toolbar: select-all & delete
-        tb = ctk.CTkFrame(header_frame, fg_color="transparent")
-        tb.grid(row=0, column=1, sticky="e")
-
-        self._select_all_var = StringVar(value="off")
-        self._select_all_cb = ctk.CTkCheckBox(
-            tb, text="Select all", variable=self._select_all_var,
-            onvalue="on", offvalue="off",
-            command=self._toggle_select_all,
-            checkbox_width=18, checkbox_height=18,
-        )
-        self._select_all_cb.grid(row=0, column=0)
+        ).grid(row=0, column=0, sticky="w", padx=12, pady=(12, 4))
 
         # -- Treeview (styled) --------------------------------------------
         style = ttk.Style()
@@ -98,7 +81,11 @@ class DiaryPane(ctk.CTkFrame):
             style="Diary.Treeview",
         )
 
-        self._tree.heading("sel",      text="☐")
+        self._tree.heading(
+            "sel",
+            text="☐",
+            command=self._toggle_select_all
+        )
         self._tree.heading("ea_st",    text="EA")
         self._tree.heading("pa_st",    text="PA")
         self._tree.heading("title",    text="Title")
@@ -183,10 +170,17 @@ class DiaryPane(ctk.CTkFrame):
             self._tree.item(row_id, values=vals)
 
     def _toggle_select_all(self):
-        """Select or deselect all records for upload."""
-        state = self._select_all_var.get() == "on"
+        """Select or deselect all records. If any are unselected, select all. Else deselect all."""
+        all_selected = all(act.selected for act in self._activities) if self._activities else False
+        new_state = not all_selected
+
         for act in self._activities:
-            act.selected = state
-            storage.update_activity(act.id, selected=state)
+            act.selected = new_state
+            storage.update_activity(act.id, selected=new_state)
+
+        # Update the header icon
+        mark = "☑" if new_state else "☐"
+        self._tree.heading("sel", text=mark)
+
         self.refresh()
 

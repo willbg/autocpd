@@ -23,10 +23,12 @@ class EntryPane(ctk.CTkFrame):
     Clicking *Clear* resets back to *Add* mode.
     """
 
-    def __init__(self, master, on_save_callback=None, on_delete_callback=None, **kwargs):
+    def __init__(self, master, on_save_callback=None, on_delete_callback=None,
+                 log_callback=None, **kwargs):
         super().__init__(master, **kwargs)
         self._on_save = on_save_callback      # called after add / update
         self._on_delete = on_delete_callback  # called after delete
+        self._log = log_callback              # write to the activity log
         self._editing_id: str | None = None   # set when editing an existing record
 
         self._build_widgets()
@@ -65,19 +67,21 @@ class EntryPane(ctk.CTkFrame):
         self._title_entry.grid(row=row, column=0, **entry_pad)
         row += 1
 
-        # -- Date ----------------------------------------------------------
-        ctk.CTkLabel(self, text="Date (YYYY-MM-DD) *").grid(row=row, column=0, **pad)
-        row += 1
-        self._date_entry = ctk.CTkEntry(self)
-        self._date_entry.insert(0, date.today().isoformat())
-        self._date_entry.grid(row=row, column=0, **entry_pad)
-        row += 1
+        # -- Date & Hours (combining to one row to save space) --------------
+        dt_hr_frame = ctk.CTkFrame(self, fg_color="transparent")
+        dt_hr_frame.grid(row=row, column=0, padx=12, pady=(4, 6), sticky="ew")
+        dt_hr_frame.columnconfigure((0, 1), weight=1)
 
-        # -- Hours ---------------------------------------------------------
-        ctk.CTkLabel(self, text="Hours *").grid(row=row, column=0, **pad)
-        row += 1
-        self._hours_entry = ctk.CTkEntry(self, placeholder_text="e.g. 1.5")
-        self._hours_entry.grid(row=row, column=0, **entry_pad)
+        # Date column (0)
+        ctk.CTkLabel(dt_hr_frame, text="Date (YYYY-MM-DD) *").grid(row=0, column=0, sticky="w")
+        self._date_entry = ctk.CTkEntry(dt_hr_frame)
+        self._date_entry.insert(0, date.today().isoformat())
+        self._date_entry.grid(row=1, column=0, sticky="ew", padx=(0, 6), pady=(2, 0))
+
+        # Hours column (1)
+        ctk.CTkLabel(dt_hr_frame, text="Hours *").grid(row=0, column=1, sticky="w")
+        self._hours_entry = ctk.CTkEntry(dt_hr_frame, placeholder_text="e.g. 1.5")
+        self._hours_entry.grid(row=1, column=1, sticky="ew", pady=(2, 0))
         row += 1
 
         # -- EA Category ---------------------------------------------------
@@ -102,6 +106,17 @@ class EntryPane(ctk.CTkFrame):
             values=PA_CATEGORIES,
         )
         self._pa_category_menu.grid(row=row, column=0, **entry_pad)
+        row += 1
+
+        # -- Notes ---------------------------------------------------------
+        ctk.CTkLabel(self, text="Notes *").grid(row=row, column=0, **pad)
+        row += 1
+        self._notes_entry = ctk.CTkTextbox(
+            self, height=150,
+            font=ctk.CTkFont(size=12),
+            wrap="word",
+        )
+        self._notes_entry.grid(row=row, column=0, **entry_pad)
         row += 1
 
         # -- Evidence file path --------------------------------------------
@@ -180,6 +195,45 @@ class EntryPane(ctk.CTkFrame):
         # -- Enable drag-and-drop if tkdnd is available --------------------
         self._setup_dnd()
 
+        # -- Spacer to push controls to the bottom -------------------------
+        spacer = ctk.CTkFrame(self, fg_color="transparent", height=0)
+        spacer.grid(row=row, column=0, sticky="nsew")
+        self.rowconfigure(row, weight=1)
+        row += 1
+
+        # -- Control buttons (portal sync) ---------------------------------
+        ctrl_sep = ctk.CTkLabel(
+            self, text="Controls",
+            font=ctk.CTkFont(size=14, weight="bold"),
+        )
+        ctrl_sep.grid(row=row, column=0, padx=12, pady=(8, 4), sticky="w")
+        row += 1
+
+        ctrl_pad = {"padx": 12, "sticky": "ew"}
+
+        self._browser_btn = ctk.CTkButton(
+            self, text="🌐  Launch Browser",
+            command=lambda: self._emit_log("Launch Browser clicked (Selenium not yet wired)."),
+            fg_color="#2980b9", hover_color="#1f6fa5",
+        )
+        self._browser_btn.grid(row=row, column=0, pady=(4, 4), **ctrl_pad)
+        row += 1
+
+        self._sync_pa_btn = ctk.CTkButton(
+            self, text="⬆  Sync to PA",
+            command=lambda: self._emit_log("Sync to PA clicked (Selenium not yet wired)."),
+            fg_color="#8e44ad", hover_color="#6c3483",
+        )
+        self._sync_pa_btn.grid(row=row, column=0, pady=4, **ctrl_pad)
+        row += 1
+
+        self._sync_ea_btn = ctk.CTkButton(
+            self, text="⬆  Sync to EA",
+            command=lambda: self._emit_log("Sync to EA clicked (Selenium not yet wired)."),
+            fg_color="#d35400", hover_color="#a04000",
+        )
+        self._sync_ea_btn.grid(row=row, column=0, pady=(4, 12), **ctrl_pad)
+
     # ------------------------------------------------------------------
     # Drag-and-drop support
     # ------------------------------------------------------------------
@@ -203,6 +257,11 @@ class EntryPane(ctk.CTkFrame):
     # Callbacks
     # ------------------------------------------------------------------
 
+    def _emit_log(self, message: str):
+        """Forward a message to the activity log (if callback is set)."""
+        if self._log:
+            self._log(message)
+
     def _browse_evidence(self):
         path = filedialog.askopenfilename(
             title="Select evidence file",
@@ -219,6 +278,7 @@ class EntryPane(ctk.CTkFrame):
         hours_str = self._hours_entry.get().strip()
         ea_cat = self._ea_category_var.get()
         pa_cat = self._pa_category_var.get()
+        notes = self._notes_entry.get("1.0", "end-1c").strip()
         evidence = self._evidence_entry.get().strip()
 
         # --- validation ---------------------------------------------------
@@ -233,6 +293,8 @@ class EntryPane(ctk.CTkFrame):
             errors.append("Select an EA category.")
         if not pa_cat:
             errors.append("Select a PA category.")
+        if not notes:
+            errors.append("Notes are required.")
         if not evidence:
             errors.append("Evidence file is required.")
         if errors:
@@ -252,6 +314,7 @@ class EntryPane(ctk.CTkFrame):
                 hours=hours,
                 ea_category=ea_cat,
                 pa_category=pa_cat,
+                notes=notes,
                 evidence_path=evidence,
             )
         else:
@@ -263,6 +326,7 @@ class EntryPane(ctk.CTkFrame):
                 hours=hours,
                 ea_category=ea_cat,
                 pa_category=pa_cat,
+                notes=notes,
                 evidence_path=evidence,
             )
             add_activity(activity)
@@ -311,6 +375,9 @@ class EntryPane(ctk.CTkFrame):
         self._evidence_entry.delete(0, "end")
         self._evidence_entry.insert(0, activity.evidence_path)
 
+        self._notes_entry.delete("1.0", "end")
+        self._notes_entry.insert("1.0", activity.notes)
+
         self._ea_category_var.set(activity.ea_category)
         self._pa_category_var.set(activity.pa_category)
 
@@ -331,6 +398,7 @@ class EntryPane(ctk.CTkFrame):
         self._date_entry.delete(0, "end")
         self._date_entry.insert(0, date.today().isoformat())
         self._hours_entry.delete(0, "end")
+        self._notes_entry.delete("1.0", "end")
         self._evidence_entry.delete(0, "end")
         self._ea_category_var.set(EA_CATEGORIES[0])
         self._pa_category_var.set(PA_CATEGORIES[0])

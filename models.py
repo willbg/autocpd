@@ -42,6 +42,7 @@ class Activity:
     hours: float
     ea_category: str
     pa_category: str
+    notes: str                             # free-text summary (up to ~1000 words)
     evidence_path: str
     ea_status: str = "Pending"             # "Pending" | "Uploaded"
     pa_status: str = "Pending"             # "Pending" | "Uploaded"
@@ -73,6 +74,8 @@ class Activity:
             filtered["ea_status"] = data["status"]
         if "status" in data and "pa_status" not in filtered:
             filtered["pa_status"] = "Pending"
+        if "notes" not in filtered:
+            filtered["notes"] = ""
 
         return cls(**filtered)
 
