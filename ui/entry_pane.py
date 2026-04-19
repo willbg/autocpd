@@ -8,14 +8,14 @@ from tkinter import filedialog, StringVar
 
 import customtkinter as ctk
 
-from models import Activity, EA_CATEGORIES, PA_CATEGORIES
+from models import Activity, DISCIPLINES, UNIFIED_CATEGORIES
 
 
 class EntryPane(ctk.CTkFrame):
     """Input form for creating and editing CPD diary entries.
 
-    Each entry maps to **both** EA and PA portals, so the form shows two
-    category dropdowns side-by-side.
+    Each entry tracks a specific engineering discipline and a unified
+    CPD category.
 
     When a row is selected in the diary table the form is populated with that
     record's data, the header shows "Editing: <title>", and the primary
@@ -32,6 +32,18 @@ class EntryPane(ctk.CTkFrame):
         self._editing_id: str | None = None   # set when editing an existing record
 
         self._build_widgets()
+
+    def _add_label_with_asterisk(self, parent, text, row, column, **kwargs):
+        """Helper to create a label with a red asterisk."""
+        frame = ctk.CTkFrame(parent, fg_color="transparent")
+        frame.grid(row=row, column=column, sticky="w", padx=kwargs.get("padx", 0), pady=kwargs.get("pady", 0))
+        
+        main_label = ctk.CTkLabel(frame, text=text)
+        main_label.pack(side="left")
+        
+        asterisk_label = ctk.CTkLabel(frame, text=" *", text_color="#e74c3c") # flat red
+        asterisk_label.pack(side="left")
+        return frame
 
     # ------------------------------------------------------------------
     # Widget construction
@@ -61,7 +73,7 @@ class EntryPane(ctk.CTkFrame):
         row += 1
 
         # -- Title ---------------------------------------------------------
-        ctk.CTkLabel(self, text="Title *").grid(row=row, column=0, **pad)
+        self._add_label_with_asterisk(self, "Title", row, 0, **pad)
         row += 1
         self._title_entry = ctk.CTkEntry(self, placeholder_text="e.g. Bridge Design Seminar")
         self._title_entry.grid(row=row, column=0, **entry_pad)
@@ -73,43 +85,61 @@ class EntryPane(ctk.CTkFrame):
         dt_hr_frame.columnconfigure((0, 1), weight=1)
 
         # Date column (0)
-        ctk.CTkLabel(dt_hr_frame, text="Date (YYYY-MM-DD) *").grid(row=0, column=0, sticky="w")
+        self._add_label_with_asterisk(dt_hr_frame, "Date (YYYY-MM-DD)", 0, 0)
         self._date_entry = ctk.CTkEntry(dt_hr_frame)
         self._date_entry.insert(0, date.today().isoformat())
         self._date_entry.grid(row=1, column=0, sticky="ew", padx=(0, 6), pady=(2, 0))
 
         # Hours column (1)
-        ctk.CTkLabel(dt_hr_frame, text="Hours *").grid(row=0, column=1, sticky="w")
+        self._add_label_with_asterisk(dt_hr_frame, "Hours", 0, 1)
         self._hours_entry = ctk.CTkEntry(dt_hr_frame, placeholder_text="e.g. 1.5")
         self._hours_entry.grid(row=1, column=1, sticky="ew", pady=(2, 0))
         row += 1
 
-        # -- EA Category ---------------------------------------------------
-        ctk.CTkLabel(self, text="EA Category *").grid(row=row, column=0, **pad)
-        row += 1
-        self._ea_category_var = StringVar(value=EA_CATEGORIES[0])
-        self._ea_category_menu = ctk.CTkOptionMenu(
-            self,
-            variable=self._ea_category_var,
-            values=EA_CATEGORIES,
+        # -- Discipline & Category (combining to one row to save space) ------
+        disc_cat_frame = ctk.CTkFrame(self, fg_color="transparent")
+        disc_cat_frame.grid(row=row, column=0, padx=12, pady=(4, 6), sticky="ew")
+        disc_cat_frame.columnconfigure((0, 1), weight=1)
+
+        # Discipline column (0)
+        self._add_label_with_asterisk(disc_cat_frame, "Discipline", 0, 0)
+        self._discipline_var = StringVar(value=DISCIPLINES[3])  # default to Civil
+        self._discipline_menu = ctk.CTkOptionMenu(
+            disc_cat_frame,
+            variable=self._discipline_var,
+            values=DISCIPLINES,
         )
-        self._ea_category_menu.grid(row=row, column=0, **entry_pad)
+        self._discipline_menu.grid(row=1, column=0, sticky="ew", padx=(0, 6), pady=(2, 0))
+
+        # Category column (1)
+        self._add_label_with_asterisk(disc_cat_frame, "Category", 0, 1)
+        self._category_var = StringVar(value=UNIFIED_CATEGORIES[0])
+        self._category_menu = ctk.CTkOptionMenu(
+            disc_cat_frame,
+            variable=self._category_var,
+            values=UNIFIED_CATEGORIES,
+        )
+        self._category_menu.grid(row=1, column=1, sticky="ew", pady=(2, 0))
         row += 1
 
-        # -- PA Category ---------------------------------------------------
-        ctk.CTkLabel(self, text="PA Category *").grid(row=row, column=0, **pad)
-        row += 1
-        self._pa_category_var = StringVar(value=PA_CATEGORIES[0])
-        self._pa_category_menu = ctk.CTkOptionMenu(
-            self,
-            variable=self._pa_category_var,
-            values=PA_CATEGORIES,
-        )
-        self._pa_category_menu.grid(row=row, column=0, **entry_pad)
+        # -- Provider Name & Contact (Optional row) ------------------------
+        provider_frame = ctk.CTkFrame(self, fg_color="transparent")
+        provider_frame.grid(row=row, column=0, padx=12, pady=(4, 6), sticky="ew")
+        provider_frame.columnconfigure((0, 1), weight=1)
+
+        # Provider Name column (0)
+        self._add_label_with_asterisk(provider_frame, "Provider Name", 0, 0)
+        self._provider_name_entry = ctk.CTkEntry(provider_frame, placeholder_text="e.g. UDEMY, EA, etc.")
+        self._provider_name_entry.grid(row=1, column=0, sticky="ew", padx=(0, 6), pady=(2, 0))
+
+        # Provider Contact column (1)
+        ctk.CTkLabel(provider_frame, text="Provider Contact").grid(row=0, column=1, sticky="w")
+        self._provider_contact_entry = ctk.CTkEntry(provider_frame, placeholder_text="e.g. Email/Phone")
+        self._provider_contact_entry.grid(row=1, column=1, sticky="ew", pady=(2, 0))
         row += 1
 
         # -- Notes ---------------------------------------------------------
-        ctk.CTkLabel(self, text="Notes *").grid(row=row, column=0, **pad)
+        self._add_label_with_asterisk(self, "Notes", row, 0, **pad)
         row += 1
         self._notes_entry = ctk.CTkTextbox(
             self, height=150,
@@ -120,7 +150,7 @@ class EntryPane(ctk.CTkFrame):
         row += 1
 
         # -- Evidence file path --------------------------------------------
-        ctk.CTkLabel(self, text="Evidence File *").grid(row=row, column=0, **pad)
+        self._add_label_with_asterisk(self, "Evidence File", row, 0, **pad)
         row += 1
 
         evidence_frame = ctk.CTkFrame(self, fg_color="transparent")
@@ -268,8 +298,10 @@ class EntryPane(ctk.CTkFrame):
         title = self._title_entry.get().strip()
         date_str = self._date_entry.get().strip()
         hours_str = self._hours_entry.get().strip()
-        ea_cat = self._ea_category_var.get()
-        pa_cat = self._pa_category_var.get()
+        discipline = self._discipline_var.get()
+        category = self._category_var.get()
+        provider_name = self._provider_name_entry.get().strip()
+        provider_contact = self._provider_contact_entry.get().strip()
         notes = self._notes_entry.get("1.0", "end-1c").strip()
         evidence = self._evidence_entry.get().strip()
 
@@ -281,10 +313,12 @@ class EntryPane(ctk.CTkFrame):
             errors.append("Date must be YYYY-MM-DD.")
         if not Activity.validate_hours(hours_str):
             errors.append("Hours must be a positive number.")
-        if not ea_cat:
-            errors.append("Select an EA category.")
-        if not pa_cat:
-            errors.append("Select a PA category.")
+        if not discipline:
+            errors.append("Select a discipline.")
+        if not category:
+            errors.append("Select a category.")
+        if not provider_name:
+            errors.append("Provider Name is required.")
         if not notes:
             errors.append("Notes are required.")
         if not evidence:
@@ -304,8 +338,10 @@ class EntryPane(ctk.CTkFrame):
                 title=title,
                 date=date_str,
                 hours=hours,
-                ea_category=ea_cat,
-                pa_category=pa_cat,
+                discipline=discipline,
+                category=category,
+                provider_name=provider_name,
+                provider_contact=provider_contact,
                 notes=notes,
                 evidence_path=evidence,
             )
@@ -316,8 +352,10 @@ class EntryPane(ctk.CTkFrame):
                 title=title,
                 date=date_str,
                 hours=hours,
-                ea_category=ea_cat,
-                pa_category=pa_cat,
+                discipline=discipline,
+                category=category,
+                provider_name=provider_name,
+                provider_contact=provider_contact,
                 notes=notes,
                 evidence_path=evidence,
             )
@@ -370,8 +408,14 @@ class EntryPane(ctk.CTkFrame):
         self._notes_entry.delete("1.0", "end")
         self._notes_entry.insert("1.0", activity.notes)
 
-        self._ea_category_var.set(activity.ea_category)
-        self._pa_category_var.set(activity.pa_category)
+        self._provider_name_entry.delete(0, "end")
+        self._provider_name_entry.insert(0, activity.provider_name)
+
+        self._provider_contact_entry.delete(0, "end")
+        self._provider_contact_entry.insert(0, activity.provider_contact)
+
+        self._discipline_var.set(activity.discipline)
+        self._category_var.set(activity.category)
 
     def clear_form(self):
         """Reset all fields and return to Add mode."""
@@ -392,5 +436,7 @@ class EntryPane(ctk.CTkFrame):
         self._hours_entry.delete(0, "end")
         self._notes_entry.delete("1.0", "end")
         self._evidence_entry.delete(0, "end")
-        self._ea_category_var.set(EA_CATEGORIES[0])
-        self._pa_category_var.set(PA_CATEGORIES[0])
+        self._provider_name_entry.delete(0, "end")
+        self._provider_contact_entry.delete(0, "end")
+        self._discipline_var.set(DISCIPLINES[3])  # Default to Civil
+        self._category_var.set(UNIFIED_CATEGORIES[0])

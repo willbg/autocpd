@@ -72,7 +72,7 @@ class DiaryPane(ctk.CTkFrame):
             foreground=[("selected", "#ffffff")],
         )
 
-        columns = ("sel", "ea_st", "pa_st", "title", "date", "hours")
+        columns = ("sel", "ea_st", "pa_st", "disc", "title", "date", "hours")
         self._tree = ttk.Treeview(
             self,
             columns=columns,
@@ -88,6 +88,7 @@ class DiaryPane(ctk.CTkFrame):
         )
         self._tree.heading("ea_st",    text="EA")
         self._tree.heading("pa_st",    text="PA")
+        self._tree.heading("disc",     text="Disc.")
         self._tree.heading("title",    text="Title")
         self._tree.heading("date",     text="Date")
         self._tree.heading("hours",    text="Hours")
@@ -95,6 +96,7 @@ class DiaryPane(ctk.CTkFrame):
         self._tree.column("sel",      width=36,  minwidth=36,  stretch=False, anchor="center")
         self._tree.column("ea_st",    width=60,  minwidth=50,  stretch=False, anchor="center")
         self._tree.column("pa_st",    width=60,  minwidth=50,  stretch=False, anchor="center")
+        self._tree.column("disc",     width=90,  minwidth=70,  stretch=False, anchor="center")
         self._tree.column("title",    width=220, minwidth=120, stretch=True)
         self._tree.column("date",     width=100, minwidth=90,  stretch=False, anchor="center")
         self._tree.column("hours",    width=60,  minwidth=50,  stretch=False, anchor="center")
@@ -128,7 +130,7 @@ class DiaryPane(ctk.CTkFrame):
             self._tree.insert(
                 "", "end",
                 iid=act.id,
-                values=(sel_mark, ea_mark, pa_mark, act.title, act.date, act.hours),
+                values=(sel_mark, ea_mark, pa_mark, act.discipline, act.title, act.date, act.hours),
             )
 
     def get_selected_activities(self) -> list[Activity]:

@@ -9,19 +9,33 @@ from typing import Optional
 
 
 # ---------------------------------------------------------------------------
-# Category lists — append freely; the UI reads these dynamically.
+# Constants — the UI reads these dynamically.
 # ---------------------------------------------------------------------------
 
-EA_CATEGORIES: list[str] = [
-    "Type I – Tertiary Education",
-    "Type II – Short Courses / Workshops",
-    "Type III – Learning on the Job",
+DISCIPLINES: list[str] = [
+    "Aerospace",
+    "Biomedical",
+    "Chemical",
+    "Civil",
+    "Electrical",
+    "Environmental",
+    "Geotechnical",
+    "ITEE",
+    "Mechanical",
+    "Mechatronics",
+    "Mining",
+    "Software",
+    "Structural",
 ]
 
-PA_CATEGORIES: list[str] = [
-    "Technical",
-    "Management",
-    "Soft Skills",
+UNIFIED_CATEGORIES: list[str] = [
+    "Tertiary Education",
+    "Short Courses / Workshops",
+    "Workplace Learning",
+    "Private Study",
+    "Service to the Profession",
+    "Preparation & Presentation",
+    "Industry Involvement",
 ]
 
 
@@ -33,17 +47,19 @@ PA_CATEGORIES: list[str] = [
 class Activity:
     """A single CPD diary entry.
 
-    Each entry is mapped to *both* EA and PA portals with independent
-    category selections and upload statuses.
+    Each entry is mapped to both EA and PA portals using a unified discipline
+    and category selection.
     """
 
     title: str
     date: str                              # ISO YYYY-MM-DD
     hours: float
-    ea_category: str
-    pa_category: str
+    discipline: str
+    category: str
     notes: str                             # free-text summary (up to ~1000 words)
     evidence_path: str
+    provider_name: str = ""                # Optional: e.g. "Engineers Australia"
+    provider_contact: str = ""             # Optional: e.g. "training@ea.org.au"
     ea_status: str = "Pending"             # "Pending" | "Uploaded"
     pa_status: str = "Pending"             # "Pending" | "Uploaded"
     selected: bool = False                 # checkbox for bulk upload
@@ -60,22 +76,35 @@ class Activity:
     def from_dict(cls, data: dict) -> Activity:
         """Construct an Activity from a dict (e.g. loaded from JSON).
 
-        Migrates legacy single-field records transparently.
+        Migrates legacy records transparently.
         """
         known_fields = {f.name for f in cls.__dataclass_fields__.values()}
+        
+        # --- migrate old single-category / discipline records ----------
+        if "category" not in data:
+            if "ea_category" in data:
+                data["category"] = data["ea_category"]
+            elif "pa_category" in data:
+                data["category"] = data["pa_category"]
+            else:
+                data["category"] = UNIFIED_CATEGORIES[0]
+
+        if "discipline" not in data:
+            data["discipline"] = DISCIPLINES[3]  # Default to Civil
+
         filtered = {k: v for k, v in data.items() if k in known_fields}
 
-        # --- migrate old single-category / single-status records ----------
-        if "category" in data and "ea_category" not in filtered:
-            filtered["ea_category"] = data["category"]
-        if "category" in data and "pa_category" not in filtered:
-            filtered["pa_category"] = ""
-        if "status" in data and "ea_status" not in filtered:
-            filtered["ea_status"] = data["status"]
-        if "status" in data and "pa_status" not in filtered:
+        # --- ensure basic defaults for status/notes if they were missing ---
+        if "ea_status" not in filtered:
+            filtered["ea_status"] = data.get("status", "Pending")
+        if "pa_status" not in filtered:
             filtered["pa_status"] = "Pending"
         if "notes" not in filtered:
             filtered["notes"] = ""
+        if "provider_name" not in filtered:
+            filtered["provider_name"] = ""
+        if "provider_contact" not in filtered:
+            filtered["provider_contact"] = ""
 
         return cls(**filtered)
 
