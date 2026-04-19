@@ -31,6 +31,7 @@ class EntryPane(ctk.CTkFrame):
         self._on_delete = on_delete_callback  # called after delete
         self._log = log_callback              # write to the activity log
         self._editing_id: str | None = None   # set when editing an existing record
+        self._active_mapper: PortalMapper | None = None
 
         self._build_widgets()
 
@@ -385,9 +386,10 @@ class EntryPane(ctk.CTkFrame):
         if not (url.startswith("http://") or url.startswith("https://")):
             url = "https://" + url
 
-        mapper = PortalMapper(url, log_callback=self._emit_log)
+        self._active_mapper = PortalMapper(url, log_callback=self._emit_log)
         
         def on_complete(mapping):
+            self._active_mapper = None
             if mapping:
                 self._emit_log(f"Portal mapping saved for {url[:30]}...")
                 # In future, we will save this to models/storage
@@ -398,7 +400,13 @@ class EntryPane(ctk.CTkFrame):
             self._learn_portal_btn.configure(state="normal", text="Map Custom Portal")
 
         self._learn_portal_btn.configure(state="disabled", text="Mapping...")
-        mapper.start(on_complete=on_complete)
+        self._active_mapper.start(on_complete=on_complete)
+
+    def shutdown(self):
+        """Clean up background sessions."""
+        if self._active_mapper:
+            self._active_mapper.stop()
+            self._active_mapper = None
 
     def _on_delete_clicked(self):
         """Delete the currently-loaded record."""
