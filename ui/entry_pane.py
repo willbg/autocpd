@@ -9,6 +9,7 @@ from tkinter import filedialog, StringVar
 import customtkinter as ctk
 
 from models import Activity, DISCIPLINES, UNIFIED_CATEGORIES
+from portal_mapper import PortalMapper
 
 
 class EntryPane(ctk.CTkFrame):
@@ -255,6 +256,14 @@ class EntryPane(ctk.CTkFrame):
             fg_color="#d35400", hover_color="#a04000",
         )
         self._sync_ea_btn.grid(row=row, column=0, pady=(4, 12), **ctrl_pad)
+        row += 1
+
+        self._learn_portal_btn = ctk.CTkButton(
+            self, text="Map Custom Portal",
+            command=self._on_learn_portal,
+            fg_color="gray30", hover_color="gray20",
+        )
+        self._learn_portal_btn.grid(row=row, column=0, pady=(4, 12), **ctrl_pad)
 
     # ------------------------------------------------------------------
     # Drag-and-drop support
@@ -364,6 +373,32 @@ class EntryPane(ctk.CTkFrame):
         self.clear_form()
         if self._on_save:
             self._on_save()
+
+    def _on_learn_portal(self):
+        """Prompt for a URL and start the interactive mapping session."""
+        dialog = ctk.CTkInputDialog(text="Enter the URL of the CPD Portal:", title="Map Custom Portal")
+        url = dialog.get_input()
+        
+        if not url:
+            return
+        
+        if not (url.startswith("http://") or url.startswith("https://")):
+            url = "https://" + url
+
+        mapper = PortalMapper(url, log_callback=self._emit_log)
+        
+        def on_complete(mapping):
+            if mapping:
+                self._emit_log(f"Portal mapping saved for {url[:30]}...")
+                # In future, we will save this to models/storage
+            else:
+                self._emit_log("Portal mapping cancelled or failed.")
+            
+            # Re-enable button if we disabled it
+            self._learn_portal_btn.configure(state="normal", text="Map Custom Portal")
+
+        self._learn_portal_btn.configure(state="disabled", text="Mapping...")
+        mapper.start(on_complete=on_complete)
 
     def _on_delete_clicked(self):
         """Delete the currently-loaded record."""
